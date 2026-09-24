@@ -91,3 +91,7 @@ Rejected frames go outside the project, to `<project>_rejected/<night folder>/`,
 | A | Autostretch |
 | F / 1 | Fit / 1:1 zoom |
 | + / − | Zoom |
+
+## License
+
+GNU General Public License v2.0. See [LICENSE](LICENSE).

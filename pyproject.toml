@@ -8,6 +8,7 @@ version = "0.1.0"
 description = "Fast two-stage culling of astrophotography FITS subframes: auto-flag, then blink."
 requires-python = ">=3.10"
 dependencies = ["numpy", "sep", "opencv-python", "PySide6"]
+classifiers = ["License :: OSI Approved :: GNU General Public License v2 (GPLv2)"]
 
 [project.scripts]
 nightsift = "nightsift.cli:main"
