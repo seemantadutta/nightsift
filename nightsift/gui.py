@@ -29,6 +29,7 @@ from .store import Store
 from .viewer import stf_lut
 
 LINEAR_LUT = (np.arange(65536) >> 8).astype(np.uint8)   # autostretch off: raw linear data
+WATCH_SECONDS = 30      # 'Watch for new frames': how often the project folder is checked
 BORDER = {'reject': QColor(230, 50, 50), 'suspect': QColor(240, 190, 30), 'reference': QColor(70, 150, 255)}
 
 APP = 'NightSift'
@@ -234,6 +235,8 @@ class MainWindow(QMainWindow):
         self._build_ui()
         self._set_enabled(False)
         self.refresh_timer = QTimer(self, interval=1500, timeout=self.refresh)
+        self.watch_timer = QTimer(self, interval=WATCH_SECONDS * 1000, timeout=self._watch_tick)
+        self._auto_scan = False
         start = initial or self.settings.value('last_project')
         if start and os.path.isdir(start):
             QTimer.singleShot(0, lambda: self.open_project(start))
@@ -287,6 +290,10 @@ class MainWindow(QMainWindow):
         self.btn_stop = QPushButton('Stop')
         self.btn_stop.clicked.connect(self.stop_scan)
         self.btn_stop.setEnabled(False)
+        self.chk_watch = QCheckBox('Watch for new frames')
+        self.chk_watch.setToolTip(f'Check the project folder every {WATCH_SECONDS} s and measure new frames as they '
+                                  'arrive (from NINA, Syncthing, …). Remembered for this project.')
+        self.chk_watch.clicked.connect(self._watch_clicked)
         r2 = QHBoxLayout()
         r2.addWidget(QLabel('Strictness'))
         r2.addWidget(self.slider)
@@ -298,6 +305,7 @@ class MainWindow(QMainWindow):
         r2.addWidget(self.btn_scan)
         r2.addWidget(self.btn_rescan)
         r2.addWidget(self.btn_stop)
+        r2.addWidget(self.chk_watch)
         r2.addSpacing(20)
         self.btn_move = QPushButton('Move rejects…')
         self.btn_move.setToolTip('Preview, then move rejected frames out of the project (never deletes)')
@@ -512,7 +520,7 @@ class MainWindow(QMainWindow):
 
     def _set_enabled(self, on):
         for w in (self.slider, self.spin, self.btn_reset, self.chk_osc, self.btn_scan, self.btn_reject,
-                  self.btn_move, self.btn_restore, self.btn_rescan):
+                  self.btn_move, self.btn_restore, self.btn_rescan, self.chk_watch):
             w.setEnabled(on)
 
     # -- project ------------------------------------------------------------------------------
@@ -571,6 +579,8 @@ class MainWindow(QMainWindow):
         self.refresh(keep_selection=False)
         self._fit_columns()
         self.chk_osc.setChecked(self.store.osc)   # first scan of a project decides it from the headers
+        self.chk_watch.setChecked(bool(self.store.config.get('watch')))
+        self._watch_clicked(self.chk_watch.isChecked(), save=False)
         self.start_scan()
 
     def choose_reject_dir(self):
@@ -614,6 +624,28 @@ class MainWindow(QMainWindow):
         self.start_scan()
 
     # -- scanning -----------------------------------------------------------------------------
+    def _watch_clicked(self, on, save=True):
+        if not self.store:
+            return
+        if save:
+            self.store.config['watch'] = bool(on)
+            self.store.save('config')
+        if on:
+            self.watch_timer.start()
+            if save:
+                self._watch_tick()
+        else:
+            self.watch_timer.stop()
+
+    def _watch_tick(self):
+        """Look for new frames, unless busy: a scan is running, or a dialog is open (e.g. while moving
+        rejects, files must not be read at the same time)."""
+        if (not self.store or (self.scan_thread and self.scan_thread.isRunning())
+                or (self._open_thread and self._open_thread.isRunning())
+                or QApplication.activeModalWidget() is not None):
+            return
+        self.start_scan(auto=True)
+
     def rescan_all(self):
         if not self.store or (self.scan_thread and self.scan_thread.isRunning()):
             return
@@ -631,9 +663,12 @@ class MainWindow(QMainWindow):
         self.view._full.clear()
         self.start_scan(force=True)
 
-    def start_scan(self, force=False):
+    def start_scan(self, force=False, auto=False):
+        """auto=True: a background check by 'Watch for new frames'. It stays quiet (no progress bar,
+        status unchanged) unless new frames turn up."""
         if not self.store or (self.scan_thread and self.scan_thread.isRunning()):
             return
+        self._auto_scan = auto
         self.scan_thread = ScanThread(self.store, force=force)
         self._scan_start = time.perf_counter()
         self.scan_thread.progress.connect(self._scan_progress)
@@ -645,17 +680,21 @@ class MainWindow(QMainWindow):
         self.btn_stop.setEnabled(True)
         for w in (self.chk_osc, self.btn_move, self.btn_restore, self.btn_rescan):
             w.setEnabled(False)
-        self.progress.setRange(0, 0)          # busy until the first phase reports
-        self.progress.show()
-        self.lbl_status.setText('Finding files… (a hard disk may take a few seconds to spin up)')
+        if not auto:
+            self.progress.setRange(0, 0)          # busy until the first phase reports
+            self.progress.show()
+            self.lbl_status.setText('Finding files… (a hard disk may take a few seconds to spin up)')
         self.scan_thread.start()
         self.refresh_timer.start()
 
     def _scan_phase(self, phase, a, b):
         if phase == 'files':
             self._paths = {os.path.basename(p): p for p in a}
-            self.lbl_status.setText(f'Found {len(a)} FITS files. Checking which are light frames…')
+            if not self._auto_scan:
+                self.lbl_status.setText(f'Found {len(a)} FITS files. Checking which are light frames…')
         elif phase == 'check':
+            if self._auto_scan:
+                return
             self.progress.setRange(0, b)
             self.progress.setValue(a)
             self.lbl_status.setText(f'Checking file headers {a}/{b} (skipping flats, darks, bias)…')
@@ -663,6 +702,7 @@ class MainWindow(QMainWindow):
             self.chk_osc.setChecked(bool(a))
         elif phase == 'measure':
             self._scan_t0 = time.perf_counter()
+            self.progress.show()
             self.progress.setRange(0, b)
             self.progress.setValue(0)
             self.lbl_status.setText(f'Measuring {b} frame(s)… (first results in a few seconds)')
@@ -691,7 +731,7 @@ class MainWindow(QMainWindow):
                                     'you can review frames meanwhile (flags settle once a night is fully measured)')
 
     def _scan_done(self, n, secs):
-        if n:   # remember the last scan that measured something (shown in the status bar)
+        if n and not self._auto_scan:   # remember the last scan that measured something (status bar)
             self.store.config['last_scan'] = dict(frames=n, seconds=round(secs, 1),
                                                   rescan=bool(self.scan_thread and self.scan_thread.force),
                                                   when=time.strftime('%Y-%m-%d %H:%M'))
@@ -702,20 +742,33 @@ class MainWindow(QMainWindow):
         self.btn_stop.setEnabled(False)
         for w in (self.chk_osc, self.btn_move, self.btn_restore, self.btn_reject, self.btn_rescan):
             w.setEnabled(True)
-        self._prev_cache.clear()             # previews may have been rebuilt
-        self._lut_cache.clear()
-        self.refresh()
-        if n:
+        if n or not self._auto_scan:
+            self._prev_cache.clear()             # previews may have been rebuilt
+            self._lut_cache.clear()
+            self.refresh()
+            write_candidates(self.store, self.frames)
+        if n and not self._auto_scan:
             self._fit_columns()
-        write_candidates(self.store, self.frames)
         errs = f', {self._scan_errors} unreadable' if self._scan_errors else ''
         bayer = any(f['metrics'].get('bayer') for f in self.frames)
         hint = '   ⚠ headers say these are colour (Bayer) frames — tick "Colour camera (OSC)"' \
             if bayer and not self.store.osc else ''
         what = 'Rescanned' if self.scan_thread and self.scan_thread.force else 'Scanned'
         new = '' if what == 'Rescanned' else 'new '
-        self.lbl_status.setText((f'{what} {n} {new}frame(s) in {secs:.0f} s{errs}.' if n else
-                                 'Up to date — all frames already measured.') + hint)
+        if self._auto_scan:
+            ok = n - self._scan_errors          # a file still being copied fails now and is retried next time
+            if ok:
+                self._watch_new = getattr(self, '_watch_new', 0) + ok
+                self._watch_last_new = time.strftime('%H:%M')
+            errs = f' · {self._scan_errors} not readable yet (still copying?)' if self._scan_errors else ''
+            got = (f'{self._watch_new} new frame(s) since watching started, last at {self._watch_last_new}'
+                   if getattr(self, '_watch_new', 0) else 'no new frames yet')
+            self.lbl_status.setText(f'Watching for new frames — {got} · checked {time.strftime("%H:%M:%S")}'
+                                    f'{errs}{hint}')
+        else:
+            self.lbl_status.setText((f'{what} {n} {new}frame(s) in {secs:.0f} s{errs}.' if n else
+                                     'Up to date — all frames already measured.') + hint)
+        self._auto_scan = False
         self.scan_thread = None
 
     # -- data refresh -------------------------------------------------------------------------

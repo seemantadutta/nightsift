@@ -32,11 +32,12 @@ def _worker(path, preview_path, osc):
 
 def is_light(path):
     """Light frame per the IMAGETYP header; if that keyword is missing, anything inside a
-    DARK/FLAT/BIAS-named folder is treated as calibration."""
+    DARK/FLAT/BIAS-named folder is treated as calibration. None: header unreadable (e.g. the file
+    is still being copied), so decide later."""
     try:
         t = read_header(path)[0].get('IMAGETYP')
     except Exception:
-        return False
+        return None
     if t is None:
         dirs = os.path.dirname(os.path.abspath(path)).upper().replace('\\', '/').split('/')
         return not any(w in d for d in dirs for w in _CALIB_WORDS)
@@ -63,9 +64,10 @@ def pending_lights(store, force=False, files=None, on_progress=None):
     todo = [f for f in files if force or (not store.is_current(f) and not store.is_skipped(f))]
     lights = []
     for i, f in enumerate(todo):
-        if is_light(f):
+        light = is_light(f)
+        if light:
             lights.append(f)
-        else:
+        elif light is not None:
             store.skip(f)   # remember calibration frames so we never re-read their headers
         if on_progress and (i % 25 == 0 or i == len(todo) - 1):
             on_progress(i + 1, len(todo))

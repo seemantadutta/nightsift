@@ -34,6 +34,8 @@ python -m nightsift.app [project folder]
 
 On Windows, use `pythonw.exe -m nightsift.app` for a shortcut without a console window.
 
+Tick **Watch for new frames** to have NightSift check the project every 30 s and measure new subs as they arrive (from NINA, or synced from a remote observatory with Syncthing or similar). The setting is remembered per project.
+
 **Command line:**
 
 ```
