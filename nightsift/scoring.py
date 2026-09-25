@@ -28,6 +28,8 @@ WEIGHT_BELOW = (0.10, 0.40)   # (SNR / median)^2
 FWHM_RATIO_ABOVE = (2.00, 1.50)
 HFR_RATIO_ABOVE = (1.80, 1.30)
 ECC_ABOVE = (0.70, 0.55)      # PixInsight scale; 0.70 ~ a/b 1.4, 0.55 ~ a/b 1.2
+MIN_GROUP = 8                 # fewer frames than this in a night + filter: its typical values are not
+                              # settled yet (e.g. early in a session), so its flags are provisional
 ECC_MARGIN = (0.15, 0.08)     # ...and must also exceed the group's typical ecc by this much, so a rig's
                               # normal slight ovalness is never flagged, however high the strictness
 
@@ -112,6 +114,7 @@ def evaluate(ms, strictness=1.0):
     for g, gm in groups.items():
         med = {k: _nanmedian([m.get(k, np.nan) for m in gm])
                for k in ('nstars', 'hfr', 'elong', 'ecc', 'bg', 'snr', 'fwhm')}
+        med['n'] = len(gm)
         stats[g] = med
         for m in gm:
             result[os.path.basename(m['file'])] = classify(m, med, limits)

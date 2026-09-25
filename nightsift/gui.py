@@ -16,10 +16,10 @@ from PySide6.QtWidgets import (QAbstractItemView, QApplication, QCheckBox, QComb
                                QFileDialog,
                                QHBoxLayout, QHeaderView, QLabel, QMainWindow, QMessageBox, QProgressBar,
                                QPushButton, QSlider, QSpinBox, QSplitter, QStyleFactory, QTableView,
-                               QTableWidget, QTableWidgetItem, QTabBar, QToolButton, QVBoxLayout, QWidget)
+                               QTableWidget, QTableWidgetItem, QTabBar, QToolButton, QVBoxLayout, QWidget, QMenu)
 
 from .engine import DEFAULT_WORKERS, build_frames, scan_iter, write_candidates
-from .scoring import night_of
+from .scoring import MIN_GROUP, night_of
 from . import movedialog
 from .align import align
 from .imageview import ImageView
@@ -29,6 +29,7 @@ from .store import Store
 from .viewer import stf_lut
 
 LINEAR_LUT = (np.arange(65536) >> 8).astype(np.uint8)   # autostretch off: raw linear data
+RECENT_MAX = 10         # recent projects remembered
 WATCH_SECONDS = 30      # 'Watch for new frames': how often the project folder is checked
 BORDER = {'reject': QColor(230, 50, 50), 'suspect': QColor(240, 190, 30), 'reference': QColor(70, 150, 255)}
 
@@ -97,9 +98,11 @@ def _duration(secs):
 
 def why_text(f):
     """Reasons for flagged frames; for OK frames, how they compare with their group anyway."""
+    few = f' · provisional: only {f["group_n"]} frames of this night + filter so far' \
+        if f.get('group_n', MIN_GROUP) < MIN_GROUP else ''
     if f['reasons']:
-        return ', '.join(f['reasons'])
-    return f'stars {_fmt_pct(f["r_stars"])}, HFR {_fmt_pct(f["r_hfr"])}'
+        return ', '.join(f['reasons']) + few
+    return f'stars {_fmt_pct(f["r_stars"])}, HFR {_fmt_pct(f["r_hfr"])}' + few
 
 
 class FrameModel(QAbstractTableModel):
@@ -246,6 +249,13 @@ class MainWindow(QMainWindow):
         # row 1: project + reject folder
         self.btn_open = QPushButton('Open project…')
         self.btn_open.clicked.connect(self.choose_project)
+        self.btn_recent = QToolButton()
+        self.btn_recent.setText('Recent ▾')
+        self.btn_recent.setToolTip('Recently opened projects')
+        self.btn_recent.setPopupMode(QToolButton.InstantPopup)
+        self.recent_menu = QMenu(self)
+        self.recent_menu.aboutToShow.connect(self._fill_recent)
+        self.btn_recent.setMenu(self.recent_menu)
         self.lbl_project = QLabel('<i>no project</i>')
         self.lbl_project.setTextInteractionFlags(Qt.TextSelectableByMouse)
         self.lbl_reject = QLabel('')
@@ -255,6 +265,7 @@ class MainWindow(QMainWindow):
         self.btn_reject.clicked.connect(self.choose_reject_dir)
         r1 = QHBoxLayout()
         r1.addWidget(self.btn_open)
+        r1.addWidget(self.btn_recent)
         r1.addWidget(self.lbl_project, 1)
         r1.addWidget(QLabel('Rejects →'))
         r1.addWidget(self.lbl_reject, 1)
@@ -551,7 +562,34 @@ class MainWindow(QMainWindow):
         self.btn_open.setEnabled(True)
         self._set_enabled(self.store is not None)
         self.lbl_status.setText('')
-        QMessageBox.warning(self, APP, f'Cannot open {path}:\n{err}')
+        if path not in self._recent():
+            QMessageBox.warning(self, APP, f'Cannot open {path}:\n{err}')
+        elif QMessageBox.question(
+                self, APP, f'Cannot open {path}:\n{err}\n\nRemove it from the recent projects list?\n'
+                '(Keep it if the drive is just not connected right now.)') == QMessageBox.Yes:
+            self.settings.setValue('recent_projects', [p for p in self._recent() if p != path])
+
+    # recently opened projects, newest first (QSettings only; no disk access, so an offline drive never blocks)
+    def _recent(self):
+        v = self.settings.value('recent_projects') or self.settings.value('last_project') or []
+        return [v] if isinstance(v, str) else list(v)
+
+    def _remember_recent(self, path):
+        self.settings.setValue('recent_projects', ([path] + [p for p in self._recent() if p != path])[:RECENT_MAX])
+
+    def _fill_recent(self):
+        m = self.recent_menu
+        m.clear()
+        recent = self._recent()
+        if not recent:
+            m.addAction('(none yet)').setEnabled(False)
+            return
+        cur = self.store.root if self.store else None
+        for p in recent:
+            a = m.addAction(p + ('   (open)' if p == cur else ''))
+            a.triggered.connect(lambda _=False, p=p: self.open_project(p))
+        m.addSeparator()
+        m.addAction('Clear list', lambda: self.settings.setValue('recent_projects', [cur] if cur else []))
 
     def _cached_paths(self):
         """Where frames were last seen, from the cache alone (no disk access)."""
@@ -566,6 +604,7 @@ class MainWindow(QMainWindow):
         self.store = store
         self._paths = self._cached_paths()
         self.settings.setValue('last_project', self.store.root)
+        self._remember_recent(self.store.root)
         self._prev_cache.clear()
         self._lut_cache.clear()
         self.setWindowTitle(f'{APP} — {self.store.root}')
@@ -678,7 +717,7 @@ class MainWindow(QMainWindow):
         self._scan_errors = 0
         self.btn_scan.setEnabled(False)
         self.btn_stop.setEnabled(True)
-        for w in (self.chk_osc, self.btn_move, self.btn_restore, self.btn_rescan):
+        for w in (self.chk_osc, self.btn_move, self.btn_restore, self.btn_reject, self.btn_rescan):
             w.setEnabled(False)
         if not auto:
             self.progress.setRange(0, 0)          # busy until the first phase reports
@@ -788,6 +827,7 @@ class MainWindow(QMainWindow):
             f['r_fwhm'] = m.get('fwhm', np.nan) / s['fwhm'] if s.get('fwhm') else np.nan
             r_snr = m.get('snr', np.nan) / s['snr'] if s.get('snr') else np.nan
             f['weight'] = r_snr ** 2
+            f['group_n'] = s['n']
         self.model.set_frames(self.frames, self.store)
         self._fill_groups()
         self._update_counts()
@@ -819,6 +859,12 @@ class MainWindow(QMainWindow):
                 it.setData(Qt.UserRole, g)
                 if c >= 3:
                     it.setTextAlignment(int(Qt.AlignRight | Qt.AlignVCenter))
+                if c == 3 and len(fs) < MIN_GROUP:
+                    it.setText(f'{len(fs)} · few')
+                    it.setForeground(QColor(150, 150, 150))
+                    it.setToolTip(f'Only {len(fs)} frames of this night + filter so far. Frames are judged '
+                                  f'against the group\'s typical values, which settle at about {MIN_GROUP}+ '
+                                  'frames, so flags here are provisional. Obvious failures are still flagged.')
                 if c == 4 and nrej:
                     it.setBackground(TIER_BG['reject'])
                 if c == 5 and nsus:
