@@ -30,7 +30,7 @@ from .viewer import stf_lut
 
 LINEAR_LUT = (np.arange(65536) >> 8).astype(np.uint8)   # autostretch off: raw linear data
 RECENT_MAX = 10         # recent projects remembered
-WATCH_SECONDS = 30      # 'Watch for new frames': how often the project folder is checked
+WATCH_SECONDS = 30      # 'Watch for new frames': default seconds between checks (adjustable in the app)
 BORDER = {'reject': QColor(230, 50, 50), 'suspect': QColor(240, 190, 30), 'reference': QColor(70, 150, 255)}
 
 APP = 'NightSift'
@@ -238,7 +238,9 @@ class MainWindow(QMainWindow):
         self._build_ui()
         self._set_enabled(False)
         self.refresh_timer = QTimer(self, interval=1500, timeout=self.refresh)
-        self.watch_timer = QTimer(self, interval=WATCH_SECONDS * 1000, timeout=self._watch_tick)
+        # drives the watch countdown + spinner; the actual check starts when the countdown reaches 0
+        self.watch_timer = QTimer(self, interval=150, timeout=self._watch_update)
+        self._watch_due, self._spin_i = 0.0, 0
         self._auto_scan = False
         start = initial or self.settings.value('last_project')
         if start and os.path.isdir(start):
@@ -302,9 +304,16 @@ class MainWindow(QMainWindow):
         self.btn_stop.clicked.connect(self.stop_scan)
         self.btn_stop.setEnabled(False)
         self.chk_watch = QCheckBox('Watch for new frames')
-        self.chk_watch.setToolTip(f'Check the project folder every {WATCH_SECONDS} s and measure new frames as they '
+        self.chk_watch.setToolTip('Check the project folder regularly and measure new frames as they '
                                   'arrive (from NINA, Syncthing, …). Remembered for this project.')
         self.chk_watch.clicked.connect(self._watch_clicked)
+        self.spin_watch = QSpinBox()
+        self.spin_watch.setRange(10, 3600)
+        self.spin_watch.setPrefix('every ')
+        self.spin_watch.setSuffix(' s')
+        self.spin_watch.setToolTip('How often to look for new frames while watching (all projects)')
+        self.spin_watch.setValue(int(self.settings.value('watch_seconds', WATCH_SECONDS)))
+        self.spin_watch.valueChanged.connect(self._watch_interval_changed)
         r2 = QHBoxLayout()
         r2.addWidget(QLabel('Strictness'))
         r2.addWidget(self.slider)
@@ -317,6 +326,7 @@ class MainWindow(QMainWindow):
         r2.addWidget(self.btn_rescan)
         r2.addWidget(self.btn_stop)
         r2.addWidget(self.chk_watch)
+        r2.addWidget(self.spin_watch)
         r2.addSpacing(20)
         self.btn_move = QPushButton('Move rejects…')
         self.btn_move.setToolTip('Preview, then move rejected frames out of the project (never deletes)')
@@ -521,7 +531,10 @@ class MainWindow(QMainWindow):
         self.progress.hide()
         self.lbl_status = QLabel('')
         self.lbl_counts = QLabel('')
+        self.lbl_watch = QLabel('')          # watch spinner / countdown
+        self.lbl_watch.hide()
         self.statusBar().addWidget(self.lbl_status, 1)
+        self.statusBar().addPermanentWidget(self.lbl_watch)
         self.statusBar().addPermanentWidget(self.progress)
         self.statusBar().addPermanentWidget(self.lbl_counts)
 
@@ -670,11 +683,33 @@ class MainWindow(QMainWindow):
             self.store.config['watch'] = bool(on)
             self.store.save('config')
         if on:
+            # ticked by hand: check right away; on opening a project its own scan runs first
+            self._watch_due = time.monotonic() + (0 if save else self.spin_watch.value())
             self.watch_timer.start()
-            if save:
-                self._watch_tick()
+            self.lbl_watch.show()
+            self._watch_update()
         else:
             self.watch_timer.stop()
+            self.lbl_watch.hide()
+
+    def _watch_interval_changed(self, v):
+        self.settings.setValue('watch_seconds', v)
+        self._watch_due = min(self._watch_due, time.monotonic() + v)
+
+    SPINNER = '◐◓◑◒'
+
+    def _watch_update(self):
+        """Every 150 ms while watching: spinner during a scan, otherwise the countdown to the next check."""
+        if self.scan_thread and self.scan_thread.isRunning():
+            self._spin_i = (self._spin_i + 1) % len(self.SPINNER)
+            what = 'checking for new frames…' if self._auto_scan else 'scanning…'
+            self.lbl_watch.setText(f'<b>{self.SPINNER[self._spin_i]}</b> {what}  ')
+            return
+        left = self._watch_due - time.monotonic()
+        if left <= 0:
+            self._watch_tick()            # may not start if busy (dialog open); tried again next update
+            left = 0
+        self.lbl_watch.setText(f'◷ next check in {int(left + 0.99)} s  ')
 
     def _watch_tick(self):
         """Look for new frames, unless busy: a scan is running, or a dialog is open (e.g. while moving
@@ -809,6 +844,7 @@ class MainWindow(QMainWindow):
                                      'Up to date — all frames already measured.') + hint)
         self._auto_scan = False
         self.scan_thread = None
+        self._watch_due = time.monotonic() + self.spin_watch.value()   # countdown restarts after any scan
 
     # -- data refresh -------------------------------------------------------------------------
     def refresh(self, keep_selection=True):
