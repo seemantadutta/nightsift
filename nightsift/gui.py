@@ -623,7 +623,8 @@ class MainWindow(QMainWindow):
                 'Your reject / keep choices, moved files, reject folder and settings are kept.\n'
                 'Current results stay visible and are replaced frame by frame; Stop at any time.\n\n'
                 'This reads every file again, so it takes as long as the first scan '
-                '(about 1.5 frames/s from a hard disk, several per second from an SSD).') != QMessageBox.Yes:
+                '(on a hard disk the disk speed is the limit: roughly one full-size frame per 1-2 s; '
+                'an NVMe SSD is 10-20x faster).') != QMessageBox.Yes:
             return
         self._prev_cache.clear()
         self._lut_cache.clear()
@@ -642,7 +643,7 @@ class MainWindow(QMainWindow):
         self._scan_errors = 0
         self.btn_scan.setEnabled(False)
         self.btn_stop.setEnabled(True)
-        for w in (self.chk_osc, self.btn_move, self.btn_restore, self.btn_reject, self.btn_rescan):
+        for w in (self.chk_osc, self.btn_move, self.btn_restore, self.btn_rescan):
             w.setEnabled(False)
         self.progress.setRange(0, 0)          # busy until the first phase reports
         self.progress.show()
@@ -686,7 +687,8 @@ class MainWindow(QMainWindow):
         if self.scan_thread and self.scan_thread._cancel:
             self.lbl_status.setText(f'Stopping… finishing the frames already being read ({done}/{total} done)')
         else:
-            self.lbl_status.setText(f'Measuring {done}/{total} · {rate:.1f} frames/s · about {mins} left{errs}')
+            self.lbl_status.setText(f'Measuring {done}/{total} · {rate:.1f} frames/s · about {mins} left{errs} · '
+                                    'you can review frames meanwhile (flags settle once a night is fully measured)')
 
     def _scan_done(self, n, secs):
         if n:   # remember the last scan that measured something (shown in the status bar)
@@ -721,6 +723,7 @@ class MainWindow(QMainWindow):
         if not self.store:
             return
         cur = self._current_frame() if keep_selection else None
+        scroll = self.table.verticalScrollBar().value()
         self.frames, self.stats = build_frames(self.store, self.spin.value(), self._paths)
         for f in self.frames:
             orig = self.store.moved.get(f['name'], f['path'])
@@ -737,7 +740,12 @@ class MainWindow(QMainWindow):
         self._update_counts()
         self._update_timeline()
         if cur:
-            self._select_name(cur['name'])
+            self._refreshing = cur['name']    # same frame again: _row_changed leaves the viewer alone
+            try:
+                self._select_name(cur['name'])
+            finally:
+                self._refreshing = None
+            self.table.verticalScrollBar().setValue(scroll)
 
     def _fill_groups(self):
         sel = self.proxy.group
@@ -877,6 +885,12 @@ class MainWindow(QMainWindow):
     def _row_changed(self, cur, _prev):
         f = self._current_frame()
         if not f:
+            return
+        if getattr(self, '_refreshing', None) == f['name']:
+            # periodic refresh while scanning re-selects the frame being viewed: keep the viewer,
+            # zoom and compare mode as they are, only update the text (its flags may have changed)
+            if not self.btn_compare.isChecked():
+                self._show_info(f)
             return
         if self.btn_compare.isChecked():        # moving to another frame ends compare mode
             self.btn_compare.blockSignals(True)
