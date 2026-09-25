@@ -16,7 +16,8 @@ from PySide6.QtWidgets import (QAbstractItemView, QApplication, QCheckBox, QComb
                                QFileDialog,
                                QHBoxLayout, QHeaderView, QLabel, QMainWindow, QMessageBox, QProgressBar,
                                QPushButton, QSlider, QSpinBox, QSplitter, QStyleFactory, QTableView,
-                               QTableWidget, QTableWidgetItem, QTabBar, QToolButton, QVBoxLayout, QWidget, QMenu)
+                               QTableWidget, QTableWidgetItem, QTabBar, QToolButton, QVBoxLayout, QWidget, QMenu,
+                               QSizePolicy)
 
 from .engine import DEFAULT_WORKERS, build_frames, scan_iter, write_candidates
 from .scoring import MIN_GROUP, night_of
@@ -530,6 +531,7 @@ class MainWindow(QMainWindow):
         self.progress.setFixedWidth(260)
         self.progress.hide()
         self.lbl_status = QLabel('')
+        self.lbl_status.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)   # long text never widens the window
         self.lbl_counts = QLabel('')
         self.lbl_watch = QLabel('')          # watch spinner / countdown
         self.lbl_watch.hide()
@@ -711,6 +713,27 @@ class MainWindow(QMainWindow):
             left = 0
         self.lbl_watch.setText(f'◷ next check in {int(left + 0.99)} s  ')
 
+    def _measured_report(self):
+        """'latest 23:53 H → OK (weight 97%, HFR 102%)' for the newest frame this scan measured,
+        plus a tally if it measured several."""
+        by_name = {f['name']: f for f in self.frames}
+        fs = [by_name[n] for n in self._scan_measured if n in by_name]
+        if not fs:
+            return ''
+        f = max(fs, key=lambda x: x['metrics'].get('date', ''))
+        m, st = f['metrics'], self.model.status(f)
+        detail = ', '.join(f['reasons']) if f['reasons'] else \
+            f'weight {_fmt_pct(f["weight"])}, HFR {_fmt_pct(f["r_hfr"])}'
+        text = (f'latest {m.get("date", "")[11:16]} {m.get("filter", "")} measured at '
+                f'{time.strftime("%H:%M")} → {st.upper()} ({detail})')
+        if len(fs) > 1:
+            tally = {}
+            for x in fs:
+                k = self.model.status(x)
+                tally[k] = tally.get(k, 0) + 1
+            text += ' · this check: ' + ', '.join(f'{v} {k}' for k, v in tally.items())
+        return text
+
     def _watch_tick(self):
         """Look for new frames, unless busy: a scan is running, or a dialog is open (e.g. while moving
         rejects, files must not be read at the same time)."""
@@ -750,6 +773,7 @@ class MainWindow(QMainWindow):
         self.scan_thread.finished_scan.connect(self._scan_done)
         self._scan_t0 = time.perf_counter()
         self._scan_errors = 0
+        self._scan_measured = []              # names measured by this scan, for the watch report
         self.btn_scan.setEnabled(False)
         self.btn_stop.setEnabled(True)
         for w in (self.chk_osc, self.btn_move, self.btn_restore, self.btn_reject, self.btn_rescan):
@@ -789,6 +813,8 @@ class MainWindow(QMainWindow):
     def _scan_progress(self, done, total, path, err):
         if err:
             self._scan_errors += 1
+        else:
+            self._scan_measured.append(os.path.basename(path))
         self.progress.show()
         self.progress.setRange(0, total)
         self.progress.setValue(done)
@@ -835,10 +861,11 @@ class MainWindow(QMainWindow):
                 self._watch_new = getattr(self, '_watch_new', 0) + ok
                 self._watch_last_new = time.strftime('%H:%M')
             errs = f' · {self._scan_errors} not readable yet (still copying?)' if self._scan_errors else ''
-            got = (f'{self._watch_new} new frame(s) since watching started, last at {self._watch_last_new}'
+            if ok:
+                self._watch_report = self._measured_report()
+            got = (f'{self._watch_new} new frame(s) measured since watching started · {self._watch_report}'
                    if getattr(self, '_watch_new', 0) else 'no new frames yet')
-            self.lbl_status.setText(f'Watching for new frames — {got} · checked {time.strftime("%H:%M:%S")}'
-                                    f'{errs}{hint}')
+            self.lbl_status.setText(f'Watching — {got} · last check {time.strftime("%H:%M:%S")}{errs}{hint}')
         else:
             self.lbl_status.setText((f'{what} {n} {new}frame(s) in {secs:.0f} s{errs}.' if n else
                                      'Up to date — all frames already measured.') + hint)

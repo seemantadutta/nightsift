@@ -97,10 +97,12 @@ def scan_iter(store, workers=DEFAULT_WORKERS, cancelled=lambda: False, force=Fal
     phase('files', files, None)
     if cancelled():
         return
+    n_skipped = len(store.skipped)
     todo = pending_lights(store, force, files, lambda d, t: phase('check', d, t))
     phase('osc', detect_osc(store, todo), None)
     if not todo or cancelled():
-        store.save('metrics', 'skipped')
+        if len(store.skipped) != n_skipped:   # nothing measured: only new calibration frames to remember
+            store.save('skipped')
         return
     phase('measure', 0, len(todo))
     osc, done, last_save = store.osc, 0, time.perf_counter()
