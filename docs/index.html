@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NightSift</title>
+<meta name="description" content="NightSift: a small desktop tool for culling bad astrophotography subframes before stacking.">
+<link rel="icon" href="icon.png">
+<style>
+  body {
+    margin: 0;
+    background: #fbfaf7;
+    color: #222;
+    font: 18px/1.6 Georgia, "Times New Roman", serif;
+  }
+  main {
+    max-width: 40rem;
+    margin: 0 auto;
+    padding: 3rem 1.25rem 4rem;
+  }
+  h1 {
+    font-size: 2rem;
+    margin: 0 0 .25rem;
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+  }
+  h1 img { width: 40px; height: 40px; }
+  h2 { font-size: 1.25rem; margin: 2.5rem 0 .5rem; }
+  .sub { color: #666; margin: 0 0 2rem; }
+  a { color: #1a5da8; }
+  figure { margin: 2rem 0; }
+  figure img { width: 100%; height: auto; border: 1px solid #ddd; }
+  figcaption { font-size: .85rem; color: #666; margin-top: .4rem; }
+  @media (min-width: 64rem) {
+    figure { margin-left: -12rem; margin-right: -12rem; }
+  }
+  ul { padding-left: 1.2rem; }
+  li { margin: .35rem 0; }
+  code, pre { font: 15px/1.5 Consolas, Menlo, monospace; }
+  pre {
+    background: #f0eee8;
+    padding: .8rem 1rem;
+    overflow-x: auto;
+  }
+  footer {
+    margin-top: 3rem;
+    padding-top: 1rem;
+    border-top: 1px solid #ddd;
+    font-size: .85rem;
+    color: #777;
+  }
+</style>
+</head>
+<body>
+<main>
+
+<h1><img src="icon.png" alt="">NightSift</h1>
+<p class="sub">Sorting out the bad subs from a night of imaging, without blinking through all of them by hand.</p>
+
+<p>
+After a few clear nights I usually end up with several hundred light frames. Some are fine,
+and some have trailed stars from a guiding hiccup, clouds drifting through, dew, focus that
+drifted off, or a filter that was never quite in focus to begin with. I used to find those
+by blinking every frame in a FITS viewer, which took longer than I'd like to admit.
+</p>
+
+<p>
+NightSift is what I wrote to make that faster. It measures every frame, flags the ones that
+look wrong compared with the rest of that night, and then lets me blink through just the
+questionable ones and make the final call.
+</p>
+
+<figure>
+  <a href="screenshot.jpg"><img src="screenshot.jpg" alt="NightSift main window: frame table on the left, the selected sub on the right, and a weight-over-time chart across the bottom with rejected frames circled in red and suspect ones in yellow." width="3439" height="1368"></a>
+  <figcaption>About 600 Ha and SII frames of NGC 7822 over several nights. Red rings are rejects, yellow rings are frames worth a second look.</figcaption>
+</figure>
+
+<h2>What it does</h2>
+<ul>
+  <li><b>Measures every sub.</b> Star count, HFR, FWHM, eccentricity, background and SNR, all computed in the background while you do something else.</li>
+  <li><b>Compares like with like.</b> Frames are only judged against others from the same night, filter and exposure, so a hazy night doesn't make a good one look bad.</li>
+  <li><b>Flags in two levels.</b> <i>Reject</i> for the obvious ones (very low weight, bloated or doughnut stars, trailing) and <i>suspect</i> for the borderline ones. A strictness slider moves the line.</li>
+  <li><b>Fast blink viewer.</b> Step through the flagged frames with the arrow keys, zoom to 1:1, and press X to reject or keep. Every choice can be undone.</li>
+  <li><b>Compare to the best frame.</b> Press R to flip between a frame and the best one of its group. It lines them up, even across a meridian flip, so the difference is easy to see.</li>
+  <li><b>Timeline.</b> A chart of weight, HFR, FWHM and so on over each night. You can see clouds coming in or focus drifting at a glance, and drag across a stretch of bad frames to reject them together.</li>
+  <li><b>Never deletes anything.</b> Rejected frames are moved to a folder <i>next to</i> the project, so you can point WBPP (or anything else) at the project folder and it only sees the good ones. <i>Restore</i> puts everything back.</li>
+</ul>
+
+<p>
+It was tuned on my own data: a mono camera with LRGB and narrowband filters, captured with
+NINA. On the two datasets I had already culled by hand, it flagged every frame I had thrown
+out. It handles one-shot-colour cameras too, though I've tested that far less.
+</p>
+
+<h2>There are other tools</h2>
+<p>
+This problem is not new, and there are good tools for it already: PixInsight's
+SubframeSelector and Blink, ASTAP, Siril, tenmon and more. I've used several of them. NightSift
+is simply my attempt at a workflow that fits the way I work: scan the whole project folder, look
+only at what needs looking at, and move the rejects out of the way before stacking. If
+another tool already works for you, there's no need to switch.
+</p>
+
+<h2>Getting it</h2>
+<p>NightSift is a Python program. With Python 3.10 or newer installed:</p>
+<pre>git clone https://github.com/seemantadutta/nightsift
+cd nightsift
+pip install -e .
+python -m nightsift.app</pre>
+<p>
+There's also a command-line version (<code>nightsift scan</code>, <code>nightsift blink</code>).
+The <a href="https://github.com/seemantadutta/nightsift">README on GitHub</a> has the details.
+I use it on Windows. It should run on macOS and Linux as well, but I haven't tried.
+</p>
+
+<p>
+It's a personal project, so expect rough edges. Bug reports and suggestions are welcome on
+<a href="https://github.com/seemantadutta/nightsift/issues">GitHub</a>.
+</p>
+
+<footer>
+  NightSift is free software under the GNU GPL v2. Written by Seemanta Dutta.
+</footer>
+
+</main>
+</body>
+</html>

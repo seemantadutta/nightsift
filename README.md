@@ -1,5 +1,7 @@
 # NightSift
 
+Project page: https://seemantadutta.github.io/nightsift/
+
 Fast culling of astrophotography subframes (FITS lights).
 
 NightSift works in two stages:
