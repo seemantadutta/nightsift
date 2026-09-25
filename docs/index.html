@@ -9,8 +9,8 @@
 <style>
   body {
     margin: 0;
-    background: #fbfaf7;
-    color: #222;
+    background: #43474d;
+    color: #e8e6e1;
     font: 18px/1.6 Georgia, "Times New Roman", serif;
   }
   main {
@@ -27,28 +27,28 @@
   }
   h1 img { width: 40px; height: 40px; }
   h2 { font-size: 1.25rem; margin: 2.5rem 0 .5rem; }
-  .sub { color: #666; margin: 0 0 2rem; }
-  a { color: #1a5da8; }
+  .sub { color: #b9b7b1; margin: 0 0 2rem; }
+  a { color: #9cc6f2; }
   figure { margin: 2rem 0; }
-  figure img { width: 100%; height: auto; border: 1px solid #ddd; }
-  figcaption { font-size: .85rem; color: #666; margin-top: .4rem; }
+  figure img { width: 100%; height: auto; border: 1px solid #2c2f33; }
+  figcaption { font-size: .85rem; color: #b9b7b1; margin-top: .4rem; }
   @media (min-width: 64rem) {
     figure { margin-left: -12rem; margin-right: -12rem; }
   }
-  ul { padding-left: 1.2rem; }
+  ul, ol { padding-left: 1.2rem; }
   li { margin: .35rem 0; }
   code, pre { font: 15px/1.5 Consolas, Menlo, monospace; }
   pre {
-    background: #f0eee8;
+    background: #373a3f;
     padding: .8rem 1rem;
     overflow-x: auto;
   }
   footer {
     margin-top: 3rem;
     padding-top: 1rem;
-    border-top: 1px solid #ddd;
+    border-top: 1px solid #5a5e65;
     font-size: .85rem;
-    color: #777;
+    color: #a9a7a2;
   }
 </style>
 </head>
@@ -60,7 +60,7 @@
 
 <p>
 After a few clear nights I usually end up with several hundred light frames. Some are fine,
-and some have trailed stars from a guiding hiccup, clouds drifting through, dew, focus that
+and some have trailed stars from a guiding hiccup, clouds drifting through, focus that
 drifted off, or a filter that was never quite in focus to begin with. I used to find those
 by blinking every frame in a FITS viewer, which took longer than I'd like to admit.
 </p>
@@ -84,14 +84,9 @@ questionable ones and make the final call.
   <li><b>Fast blink viewer.</b> Step through the flagged frames with the arrow keys, zoom to 1:1, and press X to reject or keep. Every choice can be undone.</li>
   <li><b>Compare to the best frame.</b> Press R to flip between a frame and the best one of its group. It lines them up, even across a meridian flip, so the difference is easy to see.</li>
   <li><b>Timeline.</b> A chart of weight, HFR, FWHM and so on over each night. You can see clouds coming in or focus drifting at a glance, and drag across a stretch of bad frames to reject them together.</li>
-  <li><b>Never deletes anything.</b> Rejected frames are moved to a folder <i>next to</i> the project, so you can point WBPP (or anything else) at the project folder and it only sees the good ones. <i>Restore</i> puts everything back.</li>
+  <li><b>Never deletes anything.</b> Rejected frames are moved to a folder <i>next to</i> the project, so you can point WBPP (or anything else) at the project folder and it only sees the good ones.</li>
+  <li><b>Restore.</b> Changed your mind? <i>Restore…</i> moves every rejected frame back to where it came from, so nothing you do is permanent.</li>
 </ul>
-
-<p>
-It was tuned on my own data: a mono camera with LRGB and narrowband filters, captured with
-NINA. On the two datasets I had already culled by hand, it flagged every frame I had thrown
-out. It handles one-shot-colour cameras too, though I've tested that far less.
-</p>
 
 <h2>There are other tools</h2>
 <p>
@@ -108,6 +103,19 @@ another tool already works for you, there's no need to switch.
 cd nightsift
 pip install -e .
 python -m nightsift.app</pre>
+<h2>Quick start</h2>
+<ol>
+  <li>Run <code>python -m nightsift.app</code> and click <b>Open project…</b>, then pick the folder you'd give to WBPP, the one with all your nights in it.</li>
+  <li>Click <b>Scan</b>. The first scan measures every light frame. It runs in the background and can take a while on a big project. Darks, flats and bias frames are skipped.</li>
+  <li>Go to the <b>Flagged</b> tab. Step through with the arrow keys, press <b>R</b> to compare a frame with the best one of its group, and press <b>X</b> to reject or keep it. Press <b>U</b> to undo.</li>
+  <li>Click <b>Move rejects…</b>, which shows exactly what will move and where before it touches anything. By default rejects go to <code>&lt;project&gt;_rejected</code>, next to the project folder.</li>
+  <li>Stack the project folder as usual. If you want any frames back later, <b>Restore…</b> puts them back.</li>
+</ol>
+<p>
+If NightSift flags too much or too little, move the <b>Strictness</b> slider. 1.0 is the default,
+and higher values flag more.
+</p>
+
 <p>
 There's also a command-line version (<code>nightsift scan</code>, <code>nightsift blink</code>).
 The <a href="https://github.com/seemantadutta/nightsift">README on GitHub</a> has the details.
