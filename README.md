@@ -1,6 +1,7 @@
 # NightSift
 
-Project page: https://seemantadutta.github.io/nightsift/
+Project page: https://seemantadutta.github.io/nightsift/  
+Latest release: [NightSift 1.0.0](https://github.com/seemantadutta/nightsift/releases/tag/v1.0.0)
 
 Fast culling of astrophotography subframes (FITS lights).
 
