@@ -3,9 +3,38 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>NightSift</title>
-<meta name="description" content="NightSift: a small desktop tool for culling bad astrophotography subframes before stacking.">
+<title>NightSift – cull bad astrophotography subframes before stacking</title>
+<meta name="description" content="NightSift is a free, open-source desktop tool that measures astrophotography FITS subframes (HFR, FWHM, eccentricity, SNR), flags clouds, trailing and bad focus, and lets you blink and reject bad subs before stacking in PixInsight WBPP or Siril.">
+<meta name="keywords" content="astrophotography, subframe selection, cull subframes, reject bad subs, FITS viewer, blink, HFR, FWHM, eccentricity, SNR, PixInsight, WBPP, SubframeSelector, NINA, Siril, deep sky, narrowband, LRGB, image stacking">
+<meta name="author" content="Seemanta Dutta">
+<link rel="canonical" href="https://seemantadutta.github.io/nightsift/">
 <link rel="icon" href="icon.png">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="NightSift">
+<meta property="og:title" content="NightSift – cull bad astrophotography subframes before stacking">
+<meta property="og:description" content="Measures every FITS sub, flags clouds, trailing and bad focus, and lets you blink through the questionable ones. Free and open source.">
+<meta property="og:url" content="https://seemantadutta.github.io/nightsift/">
+<meta property="og:image" content="https://seemantadutta.github.io/nightsift/screenshot.jpg">
+<meta property="og:image:alt" content="NightSift main window with a frame table, the selected sub and a timeline of frame weights.">
+<meta name="twitter:card" content="summary_large_image">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "NightSift",
+  "description": "Desktop tool for culling astrophotography FITS subframes: measures HFR, FWHM, eccentricity and SNR, flags bad frames and provides a fast blink viewer.",
+  "applicationCategory": "MultimediaApplication",
+  "operatingSystem": "Windows, macOS, Linux",
+  "url": "https://seemantadutta.github.io/nightsift/",
+  "downloadUrl": "https://github.com/seemantadutta/nightsift",
+  "screenshot": "https://seemantadutta.github.io/nightsift/screenshot.jpg",
+  "license": "https://www.gnu.org/licenses/old-licenses/gpl-2.0.html",
+  "author": {"@type": "Person", "name": "Seemanta Dutta"},
+  "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}
+}
+</script>
 <style>
   body {
     margin: 0;
