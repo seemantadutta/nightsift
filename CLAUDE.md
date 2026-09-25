@@ -52,6 +52,6 @@ Re-check both datasets after changing thresholds or metrics.
 
 - Windows. Python at `C:\Python314`.
 - The desktop shortcut runs `pythonw.exe -m nightsift.app` with this repo as the working directory.
-- Tests override QSettings('NightSift','NightSift') `last_project`. Reset it to `L:\PI_M3\LDN1251` afterwards.
+- GUI tests overwrite QSettings('NightSift','NightSift') `last_project`, `recent_projects` and `watch_seconds`. Save them before a test and restore them afterwards.
 - Write files as UTF-8 explicitly (`encoding='utf-8'`), because the default codec is cp1252.
 - There is no test suite yet. Verify changes with scripts against the test data.
