@@ -1,7 +1,7 @@
 # NightSift
 
 Project page: https://seemantadutta.github.io/nightsift/  
-Latest release: [NightSift 1.0.0](https://github.com/seemantadutta/nightsift/releases/tag/v1.0.0)
+Latest release: [NightSift 1.1.0](https://github.com/seemantadutta/nightsift/releases/tag/v1.1.0)
 
 Fast culling of astrophotography subframes (FITS lights).
 
@@ -35,6 +35,8 @@ python -m nightsift.app [project folder]
 On Windows, use `pythonw.exe -m nightsift.app` for a shortcut without a console window.
 
 Tick **Watch for new frames** to have NightSift check the project regularly (every 30 s by default; adjustable next to the checkbox) and measure new subs as they arrive (from NINA, or synced from a remote observatory with Syncthing or similar). The setting is remembered per project.
+
+The status bar shows the total integration time kept (ok + suspect frames); hover over it for a per-filter table of ok / suspect / reject / kept time. The command line prints the same table after `scan` and after a blink session.
 
 **Command line:**
 

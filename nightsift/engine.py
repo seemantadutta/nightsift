@@ -164,6 +164,39 @@ def write_candidates(store, frames):
     return path
 
 
+def frame_status(store, f):
+    """'reject' / 'suspect' / 'ok', with the user's decisions applied (same as the GUI counts)."""
+    if store.is_rejected(f):
+        return 'reject'
+    return 'suspect' if f['tier'] == 'suspect' else 'ok'
+
+
+def integration_by_filter(store, frames):
+    """{filter: {'ok': s, 'suspect': s, 'reject': s}} of summed exposure seconds, plus a 'total' row."""
+    out = {}
+    for f in frames:
+        m = f['metrics']
+        row = out.setdefault(m.get('filter') or '?', dict(ok=0.0, suspect=0.0, reject=0.0))
+        row[frame_status(store, f)] += m.get('exptime') or 0
+    total = dict(ok=0.0, suspect=0.0, reject=0.0)
+    for row in out.values():
+        for k in total:
+            total[k] += row[k]
+    out = dict(sorted(out.items()))
+    out['total'] = total
+    return out
+
+
+def fmt_duration(s):
+    """Seconds as '3h 05m', '12m 30s' or '45s'."""
+    s = int(round(s))
+    h, rem = divmod(s, 3600)
+    m, sec = divmod(rem, 60)
+    if h:
+        return f'{h}h {m:02d}m'
+    return f'{m}m {sec:02d}s' if m else f'{sec}s'
+
+
 def plan_moves(store, frames):
     """(to_move, to_restore): frames whose location does not match their reject/keep status."""
     to_move = [f for f in frames if store.is_rejected(f) and not store.in_reject_dir(f['path'])]

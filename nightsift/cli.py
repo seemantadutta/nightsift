@@ -14,8 +14,8 @@ import os
 import sys
 import time
 
-from .engine import (DEFAULT_WORKERS, build_frames, execute_moves, plan_moves, scan_iter,
-                     write_candidates)
+from .engine import (DEFAULT_WORKERS, build_frames, execute_moves, fmt_duration, integration_by_filter,
+                     plan_moves, scan_iter, write_candidates)
 from .store import Store
 
 
@@ -54,6 +54,18 @@ def report(frames, stats, store):
             print(f'   {mark} {f["metrics"].get("date", "")[11:19]}  {f["group"]:<24} {", ".join(f["reasons"])}{tag}')
     nok = sum(f['tier'] == 'ok' for f in frames)
     print(f'\n  {nok}/{len(frames)} frames ok ({nok / len(frames):.0%}).')
+    report_integration(frames, store)
+
+
+def report_integration(frames, store):
+    """Integration time per filter. 'kept' = ok + suspect, i.e. what stays in the project for WBPP."""
+    print()
+    print(f'  {"integration":<12}{"ok":>10}{"suspect":>10}{"reject":>10}{"kept":>10}')
+    for flt, t in integration_by_filter(store, frames).items():
+        if flt == 'total':
+            print('  ' + '-' * 52)
+        print(f'  {flt:<12}{fmt_duration(t["ok"]):>10}{fmt_duration(t["suspect"]):>10}'
+              f'{fmt_duration(t["reject"]):>10}{fmt_duration(t["ok"] + t["suspect"]):>10}')
 
 
 def apply_moves(store, frames, ask=True, dry_run=False):
@@ -173,6 +185,7 @@ def main(argv=None):
         Blinker(store, frames, view=a.view).run()
         store.save()
         write_candidates(store, frames)
+        report_integration(frames, store)
     if a.cmd in ('blink', 'all', 'apply'):
         apply_moves(store, frames, ask=True, dry_run=a.dry_run)
 

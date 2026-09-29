@@ -19,7 +19,8 @@ from PySide6.QtWidgets import (QAbstractItemView, QApplication, QCheckBox, QComb
                                QTableWidget, QTableWidgetItem, QTabBar, QToolButton, QVBoxLayout, QWidget, QMenu,
                                QSizePolicy)
 
-from .engine import DEFAULT_WORKERS, build_frames, scan_iter, write_candidates
+from .engine import (DEFAULT_WORKERS, build_frames, fmt_duration, integration_by_filter, scan_iter,
+                     write_candidates)
 from .scoring import MIN_GROUP, night_of
 from . import movedialog
 from .align import align
@@ -1017,8 +1018,18 @@ class MainWindow(QMainWindow):
         n = len(self.frames)
         nrej = sum(self.store.is_rejected(f) for f in self.frames) if self.store else 0
         nsus = sum(f['tier'] == 'suspect' and not self.store.is_rejected(f) for f in self.frames)
+        integ = ''
+        if self.store and self.frames:
+            it = integration_by_filter(self.store, self.frames)
+            t = it['total']
+            integ = f'kept {fmt_duration(t["ok"] + t["suspect"])} · '
+            rows = ''.join(f'<tr><td>{k}</td>' + ''.join(f'<td align=right>&nbsp;{fmt_duration(v)}</td>' for v in (
+                r['ok'], r['suspect'], r['reject'], r['ok'] + r['suspect'])) + '</tr>' for k, r in it.items())
+            self.lbl_counts.setToolTip('<b>Integration time</b> (kept = ok + suspect, what stays in the project)'
+                                       '<table><tr><th></th><th>&nbsp;ok</th><th>&nbsp;suspect</th>'
+                                       f'<th>&nbsp;reject</th><th>&nbsp;kept</th></tr>{rows}</table>')
         self.lbl_counts.setText(f'  {n} frames · {nrej} reject · {nsus} suspect · {n - nrej - nsus} ok · '
-                                f'showing {self.proxy.rowCount()} · {self._scan_time_text()}  ')
+                                f'{integ}showing {self.proxy.rowCount()} · {self._scan_time_text()}  ')
 
     def _scan_time_text(self):
         """Elapsed time while scanning; otherwise the last completed scan of this project."""
