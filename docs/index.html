@@ -97,7 +97,11 @@ by blinking every frame in a FITS viewer, which took longer than I'd like to adm
 <p>
 NightSift is what I wrote to make that faster. It measures every frame, flags the ones that
 look wrong compared with the rest of that night, and then lets me blink through just the
-questionable ones and make the final call.
+questionable ones and make the final call. With <b>Watch for new frames</b> ticked it does this
+while I'm imaging: it measures each sub as it lands in the project folder. Point your capture
+PC's folder at a sync service such as Syncthing, OneDrive or Dropbox, leave NightSift watching
+the synced copy at home, and by morning every frame is already measured and flagged. All that's
+left is to look over the suspects.
 </p>
 
 <figure>
