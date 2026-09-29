@@ -97,7 +97,11 @@ by blinking every frame in a FITS viewer, which took longer than I'd like to adm
 <p>
 NightSift is what I wrote to make that faster. It measures every frame, flags the ones that
 look wrong compared with the rest of that night, and then lets me blink through just the
-questionable ones and make the final call.
+questionable ones and make the final call. With <b>Watch for new frames</b> ticked it does this
+while I'm imaging: it measures each sub as it lands in the project folder. Point your capture
+PC's folder at a sync service such as Syncthing, OneDrive or Dropbox, leave NightSift watching
+the synced copy at home, and by morning every frame is already measured and flagged. All that's
+left is to look over the suspects.
 </p>
 
 <figure>
@@ -145,6 +149,7 @@ python -m nightsift.app</pre>
   <li>Click <b>Scan</b>. The first scan measures every light frame. It runs in the background and can take a while on a big project. Darks, flats and bias frames are skipped.</li>
   <li>Go to the <b>Flagged</b> tab. Step through with the arrow keys, press <b>R</b> to compare a frame with the best one of its group, and press <b>X</b> to reject or keep it. Press <b>U</b> to undo.</li>
   <li>Click <b>Move rejects…</b>, which shows exactly what will move and where before it touches anything. By default rejects go to <code>&lt;project&gt;_rejected</code>, next to the project folder.</li>
+  <li>Check the status bar for how much integration time you're keeping. Hover over it for a table per filter: <i>ok</i>, <i>suspect</i>, <i>reject</i> and <i>kept</i> (ok + suspect, which is what stays in the project).</li>
   <li>Stack the project folder as usual. If you want any frames back later, <b>Restore…</b> puts them back.</li>
 </ol>
 <p>
@@ -152,8 +157,28 @@ If NightSift flags too much or too little, move the <b>Strictness</b> slider. 1.
 and higher values flag more.
 </p>
 
+<h2>Watching a session live</h2>
 <p>
-There's also a command-line version (<code>nightsift scan</code>, <code>nightsift blink</code>).
+NightSift doesn't have to wait until the morning. Open the project you're capturing into and tick
+<b>Watch for new frames</b>. NightSift checks the folder regularly (every 30 seconds by default;
+change it next to the checkbox) and measures each new sub as NINA saves it. It works just as well
+with frames synced in from a remote observatory with Syncthing or similar.
+</p>
+<ul>
+  <li>The status bar shows a countdown to the next check, and the newest frame with its verdict.</li>
+  <li>The frame list and timeline update as frames arrive, without resetting the viewer, so you can keep reviewing while it measures.</li>
+  <li>A frame that is still being written is picked up on the next check.</li>
+  <li>Groups with fewer than 8 frames are marked <i>few</i>. Early in the night there is little to compare against, so flags there are provisional. Obvious failures are still flagged.</li>
+  <li>The setting is remembered per project.</li>
+</ul>
+<p>
+A cloud bank or focus drift shows up in the timeline within minutes, while there's still time to
+fix it.
+</p>
+
+<p>
+There's also a command-line version (<code>nightsift scan</code>, <code>nightsift blink</code>,
+<code>nightsift watch</code>).
 The <a href="https://github.com/seemantadutta/nightsift">README on GitHub</a> has the details.
 I use it on Windows. It should run on macOS and Linux as well, but I haven't tried.
 </p>
